@@ -4,6 +4,7 @@ from tensorflow.keras.applications import DenseNet121
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications import ResNet101
 from tensorflow.keras.applications import EfficientNetB7
+from tensorflow.keras.applications import VGG19
 import sys
 import gym
 from rl.agents import DDPGAgent
@@ -63,7 +64,7 @@ def plot_sample_images(dataflowvalidation):
 
 def build_model():
     # Load EfficientNetB0 with pre-trained ImageNet weights
-    basemodel = EfficientNetB7(weights='imagenet', include_top=False,
+    basemodel = VGG19(weights='imagenet', include_top=False,
                                input_shape=(224, 224, 3), pooling=None)
 
     # Add new top layers
@@ -111,7 +112,7 @@ class DataAugmentationEnv(gym.Env):
                             width_shift_range=0.05,
                             height_shift_range=0.05,
                             fill_mode='constant',
-                            validation_split=0.3,
+                            validation_split=0.2,
                             horizontal_flip=True,
                             vertical_flip=True,
                             zoom_range=0.2,)
@@ -163,7 +164,7 @@ class DataAugmentationEnv(gym.Env):
         val_loss = np.min(hist.history['val_loss'])
         if val_loss < self.best_val_loss:
             self.best_val_loss = val_loss
-            m.save('efiicientnetb7.h5')
+            m.save('VGG19.h5')
             print('save the model')
         reward = -val_loss  # 注意这里取了负值，因为损失越低越好。
         done = True
@@ -202,7 +203,7 @@ def main():
     original_stdout = sys.stdout
 
     # 打开文件，如果文件不存在则创建，如果存在则覆盖
-    with open('efficientnetb7 result.txt', 'w') as f:
+    with open('COVID Resnet101 result', 'w') as f:
         # 将标准输出重定向到文件
         sys.stdout = f
         datasetfolder = 'C:\\Users\\PS\\Desktop\\XAI code\\brain tumor\\Training'
