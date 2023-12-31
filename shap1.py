@@ -1,62 +1,78 @@
-
-import tensorflow as tf
-import shap
+from tensorflow.keras.models import load_model
+from keras.preprocessing.image import ImageDataGenerator
+from sklearn.metrics import classification_report, confusion_matrix
 import numpy as np
 import matplotlib.pyplot as plt
-from IPython.display import Image, display
-from tensorflow.keras.models import load_model
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras.applications import VGG16
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Flatten, Dense, Dropout
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.models import load_model
+import seaborn as sns
 
-# 加载数据
-data_path = "C:\\Users\\DELL\\Desktop\\code\\dataset\\brain tumor"
-train_data_path = data_path + "\\Training"
-test_data_path = data_path + "\\Testing"
-datagen = ImageDataGenerator(rescale=1 / 255,
-                            rotation_range=0.2,
-                            width_shift_range=0.05,
-                            height_shift_range=0.05,
-                            fill_mode='constant',
-                            validation_split=0.2,
-                            horizontal_flip=True,
-                            vertical_flip=True,
-                            zoom_range=0.2
-                            )
+def load_test_data(test_folder, batch_size=16):
+    """
+    Load test data from a specified folder.
+    """
+    test_datagen = ImageDataGenerator(rescale=1. / 255)
+    test_generator = test_datagen.flow_from_directory(
+        test_folder,
+        target_size=(224, 224),
+        color_mode='rgb',
+        batch_size=batch_size,
+        class_mode='categorical',
+        shuffle=False)
 
-train_generator = datagen.flow_from_directory(
-    train_data_path,
-    target_size=(224, 224),
-    batch_size=32,
-    class_mode='categorical'
-)
-# 加载要解释的图像
-img_path = "C:\\Users\\DELL\\Desktop\\code\\dataset\\image(89).jpg"
-img_array = tf.keras.preprocessing.image.img_to_array(tf.keras.preprocessing.image.load_img(img_path, target_size=(224, 224)))
-img_array = np.expand_dims(img_array, axis=0) / 255.
+    return test_generator
+
+def plot_confusion_matrix(cm, class_labels):
+    """
+    Plot a beautiful confusion matrix with larger fonts.
+    """
+    sns.set(context='talk', style='whitegrid', palette='deep', font='sans-serif', font_scale=1.2)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
+    plt.xlabel('Predicted labels', fontsize=18)
+    plt.ylabel('True labels', fontsize=18)
+    plt.title('Confusion Matrix', fontsize=18)
+    plt.show()
 
 
-# 加载模型
-loaded_model = load_model('densnet.h5')
-# 创建一个Deep SHAP解释器。注意，SHAP希望有背景数据来估计shap值。
-background = train_generator.next()[0]  # 使用一些训练数据作为背景。如果需要，你可以使用多个批次。
-explainer = shap.GradientExplainer(loaded_model, background)
+def evaluate_model(model_path, test_folder):
+    """
+    Load a model and evaluate it on the test set.
+    """
+    # Load the model
+    model = load_model(model_path)
 
-# 计算SHAP值
-shap_values = explainer.shap_values(img_array)
+    # Load test data
+    test_generator = load_test_data(test_folder)
 
-# 可视化SHAP值
-shap.image_plot(shap_values, img_array)
+    # Get the number of samples and number of classes
+    num_samples = test_generator.samples
+    num_classes = test_generator.num_classes
 
-# 使用模型预测图像。
-preds = loaded_model.predict(img_array)
+    # Predict the whole test set
+    test_generator.reset()
+    predictions = model.predict(test_generator, steps=np.ceil(num_samples / test_generator.batch_size), verbose=1)
+    predicted_classes = np.argmax(predictions, axis=1)
+    true_classes = test_generator.classes
+    class_labels = list(test_generator.class_indices.keys())
 
-# 查找具有最大概率的类索引。
-predicted_class_index = np.argmax(preds[0])
-class_labels = ['glioma_tumor', 'meningioma_tumor', 'no_tumor', 'pituitary_tumor']
-print("Predicted:", class_labels[predicted_class_index])
+    # Ensure the number of class labels matches the number of classes predicted by the model
+    if len(class_labels) != num_classes:
+        raise ValueError(f"Number of class labels ({len(class_labels)}) does not match number of classes predicted by the model ({num_classes}).")
+
+    # Compute confusion matrix
+    cm = confusion_matrix(true_classes, predicted_classes)
+    print('Confusion Matrix:')
+    print(cm)
+
+    # Plot confusion matrix
+    plot_confusion_matrix(cm, class_labels)
+
+    # Compute classification report
+    report = classification_report(true_classes, predicted_classes, target_names=class_labels)
+    print('Classification Report:')
+    print(report)
+
+
+# 使用测试集路径调用 evaluate_model 函数
+test_folder ="C:\\Users\\DELL\\Desktop\\code\\dataset\\covid-xray\\Data\\train"# 替换为测试集文件夹的路径
+model_path = "C:\\Users\\DELL\\Desktop\\data processing\\covid\\Densenet121\\COVID DenseNet121.h5"# 模型文件路径
+evaluate_model(model_path, test_folder)
