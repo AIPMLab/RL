@@ -3,8 +3,12 @@ import tensorflow as tf
 from tensorflow.keras.applications import DenseNet121
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications import ResNet101
+from tensorflow.keras.applications import EfficientNetB0
 from tensorflow.keras.applications import EfficientNetB7
 from tensorflow.keras.applications import VGG19
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.applications import InceptionV3
+from tensorflow.keras.callbacks import Callback
 import sys
 import gym
 from rl.agents import DDPGAgent
@@ -31,6 +35,28 @@ if gpus:
         print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
     except RuntimeError as e:
         print(e)
+
+# 自定义回调函数，跟踪最小的验证损失
+class MinValLossTracker(Callback):
+    def __init__(self):
+        super(MinValLossTracker, self).__init__()
+        self.min_val_loss = float('inf')
+        self.best_epoch_stats = {}
+
+    def on_epoch_end(self, epoch, logs=None):
+        if logs is not None:
+            val_loss = logs.get('val_loss')
+            if val_loss < self.min_val_loss:
+                self.min_val_loss = val_loss
+                self.best_epoch_stats = logs.copy()
+                self.best_epoch_stats['epoch'] = epoch
+
+    def on_train_end(self, logs=None):
+        best_epoch = self.best_epoch_stats.get('epoch')
+        print(f"\nBest Epoch: {best_epoch}")
+        for key, value in self.best_epoch_stats.items():
+            if key != 'epoch':
+                print(f"{key}: {value:.4f}")
 
 def load_data(datasetfolder, image_data_generator):
     dataflowtraining = image_data_generator.flow_from_directory(
@@ -64,24 +90,23 @@ def plot_sample_images(dataflowvalidation):
 
 def build_model():
     # Load EfficientNetB0 with pre-trained ImageNet weights
-    basemodel = VGG19(weights='imagenet', include_top=False,
-                               input_shape=(224, 224, 3), pooling=None)
-
+    basemodel = VGG19(weights='imagenet', include_top=False, input_shape=(224, 224, 3), pooling=None)
     # Add new top layers
     x = tf.keras.layers.GlobalAveragePooling2D()(basemodel.output)
+    #x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(basemodel.output)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Dropout(0.7)(x)
     x = tf.keras.layers.Dense(128, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.5)(x)
     x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dense(4, activation='softmax')(x)
+    x = tf.keras.layers.Dense(3, activation='softmax')(x)
 
     # Create the model
     m = tf.keras.models.Model(inputs=basemodel.input, outputs=x)
 
     # Compile the model
-    m.compile(loss='binary_crossentropy',
-              optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+    m.compile(loss='categorical_crossentropy',   #'categorical_crossentropy','binary_crossentropy'
+              optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
               metrics=['accuracy', tf.keras.metrics.Precision(name='precision'),
                        tf.keras.metrics.Recall(name='recall')])
     return m
@@ -141,8 +166,9 @@ class DataAugmentationEnv(gym.Env):
         m = build_model()
 
         callbacks_list = [
-            tf.keras.callbacks.EarlyStopping(patience=8, monitor='val_loss', mode='min', restore_best_weights=True),
-            tf.keras.callbacks.ReduceLROnPlateau(patience=6, monitor='val_loss', mode='min', factor=0.1)
+            tf.keras.callbacks.EarlyStopping(patience=20, monitor='val_loss', mode='min', restore_best_weights=True),
+            tf.keras.callbacks.ReduceLROnPlateau(patience=6, monitor='val_loss', mode='min', factor=0.1),
+            MinValLossTracker()
         ]
 
         hist = m.fit(
@@ -164,7 +190,7 @@ class DataAugmentationEnv(gym.Env):
         val_loss = np.min(hist.history['val_loss'])
         if val_loss < self.best_val_loss:
             self.best_val_loss = val_loss
-            m.save('VGG19.h5')
+            m.save('sp1 test VGG19.h5')
             print('save the model')
         reward = -val_loss  # 注意这里取了负值，因为损失越低越好。
         done = True
@@ -203,21 +229,21 @@ def main():
     original_stdout = sys.stdout
 
     # 打开文件，如果文件不存在则创建，如果存在则覆盖
-    with open('COVID Resnet101 result', 'w') as f:
+    with open('sp1 VGG19 test result.txt', 'w') as f:
         # 将标准输出重定向到文件
         sys.stdout = f
-        datasetfolder = 'C:\\Users\\PS\\Desktop\\XAI code\\brain tumor\\Training'
+        datasetfolder = "C:\\Users\\PS\\Desktop\\covid-xray\\Data\\test"
         env = DataAugmentationEnv(datasetfolder)
         actor = build_actor(env)
         action_input, critic = build_critic(env)
-        memory = SequentialMemory(limit=100000, window_length=1)
+        memory = SequentialMemory(limit=1000, window_length=1)
         random_process = OrnsteinUhlenbeckProcess(size=env.action_space.shape[0], theta=.15, mu=0., sigma=.3)
         agent = DDPGAgent(nb_actions=env.action_space.shape[0], actor=actor, critic=critic,
                           critic_action_input=action_input,
                           memory=memory, nb_steps_warmup_critic=100, nb_steps_warmup_actor=100,
                           random_process=random_process, gamma=.99, target_model_update=1e-3)
-        agent.compile(Adam(lr=.001, clipnorm=1.), metrics=["mae"])
-        agent.fit(env, nb_steps=2000, visualize=False, verbose=1)
+        agent.compile(Adam(lr=.00001, clipnorm=1.), metrics=["mae"])
+        agent.fit(env, nb_steps=100, visualize=False, verbose=1)
         sys.stdout = original_stdout
 
 if __name__ == "__main__":
