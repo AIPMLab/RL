@@ -1,5 +1,8 @@
 # RL
-the dataset could be found in https://www.kaggle.com/datasets/sartajbhuvaji/brain-tumor-classification-mri
+the dataset could be found in https://www.kaggle.com/datasets/forderation/breakhis-400x
+                              https://www.kaggle.com/datasets/sartajbhuvaji/brain-tumor-classification-mri
+                              https://www.kaggle.com/datasets/prashant268/chest-xray-covid19-pneumonia
+                              
 
 the train environment:
 gym 0.26.2
