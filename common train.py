@@ -69,7 +69,7 @@ def build_model():
     basemodel = EfficientNetB0(weights=None, include_top=False,
                       input_shape=(224, 224, 3))
 
-    # 添加最大池化层
+    # Add an average pooling layer
     x = tf.keras.layers.AveragePooling2D(pool_size=(2, 2))(basemodel.output)
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dropout(0.7)(x)
@@ -126,13 +126,13 @@ def plot_history(hist):
 
 
 def main():
-    datasetfolder ="C:\\Users\\DELL\\Desktop\\code\\dataset\\covid-xray\\Data\\train"
+    datasetfolder = "C:\\Users\\DELL\\Desktop\\code\\dataset\\covid-xray\\Data\\train"
     dataflowtraining, dataflowvalidation = load_data(datasetfolder)
 
     plot_sample_images(dataflowvalidation)
 
     m = build_model()
-    # 添加 ModelCheckpoint 回调
+    # Add ModelCheckpoint callback
     checkpoint = ModelCheckpoint('New COVID19 EfficientNetB0.h5',
                                  save_best_only=True,
                                  monitor='val_loss',
@@ -155,4 +155,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

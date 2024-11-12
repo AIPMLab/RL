@@ -36,7 +36,7 @@ if gpus:
     except RuntimeError as e:
         print(e)
 
-# 自定义回调函数，跟踪最小的验证损失
+# Custom callback function to track the minimum validation loss
 class MinValLossTracker(Callback):
     def __init__(self):
         super(MinValLossTracker, self).__init__()
@@ -75,9 +75,7 @@ def load_data(datasetfolder, image_data_generator):
         shuffle=True,
         subset='validation')
 
-
     return dataflowtraining, dataflowvalidation
-
 
 def plot_sample_images(dataflowvalidation):
     images, labels = dataflowvalidation.next()
@@ -93,7 +91,6 @@ def build_model():
     basemodel = VGG19(weights='imagenet', include_top=False, input_shape=(224, 224, 3), pooling=None)
     # Add new top layers
     x = tf.keras.layers.GlobalAveragePooling2D()(basemodel.output)
-    #x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(basemodel.output)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Dropout(0.7)(x)
     x = tf.keras.layers.Dense(128, activation='relu')(x)
@@ -105,12 +102,11 @@ def build_model():
     m = tf.keras.models.Model(inputs=basemodel.input, outputs=x)
 
     # Compile the model
-    m.compile(loss='categorical_crossentropy',   #'categorical_crossentropy','binary_crossentropy'
+    m.compile(loss='categorical_crossentropy',
               optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
               metrics=['accuracy', tf.keras.metrics.Precision(name='precision'),
                        tf.keras.metrics.Recall(name='recall')])
     return m
-
 
 def plot_history(hist):
     plt.figure(figsize=(12, 6))
@@ -121,7 +117,6 @@ def plot_history(hist):
         plt.plot(hist.history['val_{}'.format(metrics[i])], label='val_{}'.format(metrics[i]))
         plt.legend()
     plt.show()
-
 
 class DataAugmentationEnv(gym.Env):
     def __init__(self, datasetfolder):
@@ -160,7 +155,7 @@ class DataAugmentationEnv(gym.Env):
             vertical_flip=True,
         )
 
-        # 使用更新后的生成器加载数据
+        # Load data using the updated generator
         self.dataflowtraining, self.dataflowvalidation = load_data(self.datasetfolder, updated_generator)
 
         m = build_model()
@@ -179,8 +174,6 @@ class DataAugmentationEnv(gym.Env):
             callbacks=callbacks_list
         )
 
-        # 其余代码保持不变
-
         print("loss: {:.4f} - accuracy: {:.4f} - precision: {:.4f} - recall: {:.4f} - val_loss: {:.4f} - val_accuracy: {:.4f} - val_precision: {:.4f} - val_recall: {:.4f} - lr: {:.1e}".format(
             hist.history['loss'][-1], hist.history['accuracy'][-1], hist.history['precision'][-1], hist.history['recall'][-1],
             hist.history['val_loss'][-1], hist.history['val_accuracy'][-1], hist.history['val_precision'][-1], hist.history['val_recall'][-1],
@@ -192,7 +185,7 @@ class DataAugmentationEnv(gym.Env):
             self.best_val_loss = val_loss
             m.save('sp1 test VGG19.h5')
             print('save the model')
-        reward = -val_loss  # 注意这里取了负值，因为损失越低越好。
+        reward = -val_loss  # Note the negative value here since lower loss is better.
         done = True
         return np.array([0.5]), reward, done, {}
 
@@ -223,14 +216,13 @@ def build_critic(env):
     critic = tf.keras.models.Model(inputs=[action_input, observation_input], outputs=x)
     return action_input, critic
 
-
 def main():
-    # 保存当前的标准输出流
+    # Save the current standard output stream
     original_stdout = sys.stdout
 
-    # 打开文件，如果文件不存在则创建，如果存在则覆盖
+    # Open file, create if does not exist, overwrite if it does
     with open('sp1 VGG19 test result.txt', 'w') as f:
-        # 将标准输出重定向到文件
+        # Redirect standard output to file
         sys.stdout = f
         datasetfolder = "C:\\Users\\PS\\Desktop\\covid-xray\\Data\\test"
         env = DataAugmentationEnv(datasetfolder)
